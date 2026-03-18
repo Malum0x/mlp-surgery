@@ -27,7 +27,7 @@ def load_model(path):
     return model, tokenizer
 
 # collect error samples 
-def correct_error_samples(model, tokenizer, max_samples=100)
+def collect_error_samples(model, tokenizer, max_samples=100)
     dataset = load_dataset("gsm8k", "main", split="test")
     error_samples = []
 
