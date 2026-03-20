@@ -9,7 +9,7 @@ from tqdm import tqdm
 
 # config
 
-FINETUNED_MODEL_PATH = " PATH "
+FINETUNED_MODEL_PATH = ""
 OUTPUT_PATH = "results/layer_scores.json"
 NUM_ERROR_SAMPLES = 100
 MAX_NEW_TOKENS = 256

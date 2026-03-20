@@ -1,0 +1,6 @@
+# directories
+merged_model/
+dataset/
+results/
+venv/
+wandb/
