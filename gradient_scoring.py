@@ -5,11 +5,19 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from datasets import load_dataset
 from tqdm import tqdm
+import re
+
+def extract_number(text):
+    "pull the last number out of any text"
+    numbers = re.findall(r'-?\d+\.?\d*', text)
+    if numbers:
+        return numbers[-1].strip()
+    return None
 
 
 # config
 
-FINETUNED_MODEL_PATH = ""
+FINETUNED_MODEL_PATH = "merged_model/"
 OUTPUT_PATH = "results/layer_scores.json"
 NUM_ERROR_SAMPLES = 100
 MAX_NEW_TOKENS = 256
@@ -27,7 +35,7 @@ def load_model(path):
     return model, tokenizer
 
 # collect error samples 
-def collect_error_samples(model, tokenizer, max_samples=100)
+def collect_error_samples(model, tokenizer, max_samples=100):
     dataset = load_dataset("gsm8k", "main", split="test")
     error_samples = []
 
@@ -54,15 +62,23 @@ def collect_error_samples(model, tokenizer, max_samples=100)
         )
 
         #check if model got it wrong
-        if correct not in response:
+        correct_num = extract_number(correct)
+        response_num = extract_number(response)
+
+        print(f"Correct: {correct_num} | Model said: {response_num}")
+
+        if correct_num and response_num and correct_num != response_num:
             error_samples.append({
-                "prompt": prompt,
-                "correct": correct,
-                "response": response
+                "prompt":   prompt,
+                "correct":  correct_num,
+                "response": response_num
             })
 
-        print(f"Found {len(error_samples)} error samples")
-        return error_samples
+
+
+
+    print(f"Found {len(error_samples)} error samples")
+    return error_samples
     
 def score_layers(model, tokenizer, error_samples):
     layer_scores = {}
