@@ -4,3 +4,4 @@ dataset/
 results/
 venv/
 wandb/
+restored_model/

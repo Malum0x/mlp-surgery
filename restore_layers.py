@@ -6,9 +6,9 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 BASE_MODEL_PATH = "Qwen/Qwen2.5-3B-Instruct"
 FINETUNED_MODEL_PATH = "merged_model/"
-LAYER_SCORES_PATH = "resutls/layer_scores.json"
+LAYER_SCORES_PATH = "results/layer_scores.json"
 RESTORED_OUTPUT_PATH = "restored_model/"
-TOP_K_LAYERS = 10
+TOP_K_LAYERS = 4
 
 def load_top_layers(scores_path, top_k):
     print(f"loading layer scores from {scores_path}")
@@ -28,7 +28,7 @@ def load_top_layers(scores_path, top_k):
     
 def load_models(base_path, finetuned_path):
     print("\n Loading base model")
-    base_model = AutoModelForCausalLm.from_pretrained(
+    base_model = AutoModelForCausalLM.from_pretrained(
         base_path,
         torch_dtype=torch.bfloat16,
         device_map="auto"
@@ -55,7 +55,7 @@ def restore_layers(base_model, finetuned_model, top_layers):
     restored_count = 0
 
     base_params = dict(base_model.named_parameters())
-    finetuned_params = dict(finetuned_model.named_parameteres())
+    finetuned_params = dict(finetuned_model.named_parameters())
 
     for layer_name in top_layers:
         if layer_name in base_params:

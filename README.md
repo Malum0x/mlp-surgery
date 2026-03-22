@@ -30,7 +30,11 @@ Research (ROME, 2022) has shown that factual knowledge and reasoning capabilitie
 Attention layers handle structure and token relationships, these are left frozen. Targeting only MLP layers reduces trainable parameters and minimises the risk of introducing new damage to work capabilities.
 
 ## Status: 
-        IN PROGRESS -  gradient norm scoring (not started yet)
+Gradient norm scoring revealed an unexpected outlier: 
+        - layer 2 down_proj scored 84.1, which is approximately 7x higher than the next most damaged layer (12.9)
+        - layers 9-27 show consistent moderate damage, consistent with the hypothesis that middle layers store mathematical reasoning capabilities
+
+
 
 ## Related 
 links later I'm lazya 
