@@ -42,3 +42,7 @@ Gradient norm scoring revealed an unexpected outlier:
 
 
 ## Related 
+https://github.com/Malum0x/Perplexity-weighted-selective-finetuning
+
+https://huggingface.co/datasets/Malum0x/openhermes2.5-Perplexity_filtered_top30
+
