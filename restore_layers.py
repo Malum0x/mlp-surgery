@@ -7,8 +7,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 BASE_MODEL_PATH = "Qwen/Qwen2.5-3B-Instruct"
 FINETUNED_MODEL_PATH = "merged_model/"
 LAYER_SCORES_PATH = "results/layer_scores.json"
-RESTORED_OUTPUT_PATH = "restored_model/"
-TOP_K_LAYERS = 4
+RESTORED_OUTPUT_PATH = "restored_model_C/"
+TOP_K_LAYERS = 30
 
 def load_top_layers(scores_path, top_k):
     print(f"loading layer scores from {scores_path}")

@@ -5,3 +5,5 @@ results/
 venv/
 wandb/
 restored_model/
+restored_model_B/
+restored_model_C/

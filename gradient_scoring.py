@@ -18,7 +18,7 @@ def extract_number(text):
 # config
 
 FINETUNED_MODEL_PATH = "merged_model/"
-OUTPUT_PATH = "results/layer_scores.json"
+OUTPUT_PATH = "results/specificity_scores.json"
 NUM_ERROR_SAMPLES = 100
 MAX_NEW_TOKENS = 256
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -79,7 +79,47 @@ def collect_error_samples(model, tokenizer, max_samples=100):
 
     print(f"Found {len(error_samples)} error samples")
     return error_samples
+
+# collect correct samples
+def collect_correct_samples(model, tokenizer, max_samples=100):
+    dataset = load_dataset("gsm8k", "main", split="test")
+    correct_samples = [] 
+
+    for item in tqdm(dataset, desc="finding correct samples"):
+        if len(correct_samples) >= max_samples:
+            break
+
+        question = item["question"]
+        correct = item["answer"].split("####")[-1].strip()
+
+        prompt = f"Question: {question}\nAnswer:"
+        inputs = tokenizer(prompt, return_tensors="pt").to(DEVICE)
+
+        with torch.no_grad():
+            output = model.generate(
+                **inputs,
+                max_new_tokens=MAX_NEW_TOKENS,
+                do_sample=False
+            )
+        response = tokenizer.decode(
+            output[0][inputs["input_ids"].shape[1]:],
+            skip_special_tokens=True
+        )
+
+        correct_num = extract_number(correct)
+        response_num = extract_number(response)
+
+        if correct_num and response_num and correct_num == response_num:
+            correct_samples.append({
+                "prompt": prompt,
+                "correct": correct_num,
+                "response": response_num
+            })
     
+    print(f"Found {len(correct_samples)} correct samples ")
+    return correct_samples
+
+
 def score_layers(model, tokenizer, error_samples):
     layer_scores = {}
     model.train()
@@ -142,11 +182,19 @@ def save_results(layer_scores, output_path):
 
 if __name__ == "__main__":
     model, tokenizer = load_model(FINETUNED_MODEL_PATH)
-    error_samples = collect_error_samples(
-        model,
-        tokenizer,
-        max_samples=NUM_ERROR_SAMPLES
-    )
+    error_samples = collect_error_samples(model, tokenizer)
+    error_scores = score_layers(model, tokenizer, error_samples)
 
-    layer_scores = score_layers(model, tokenizer, error_samples)
-    save_results(layer_scores, OUTPUT_PATH) 
+    model.eval()
+
+    correct_samples = collect_correct_samples(model, tokenizer)
+    correct_scores = score_layers(model, tokenizer, correct_samples)
+
+    specificity = {}
+    for name in error_scores: 
+        if name in correct_scores and correct_scores[name] > 0:
+            specificity[name] = error_scores[name] / correct_scores[name]
+        else:
+            specificity[name] = error_scores[name]
+    
+    save_results(specificity, OUTPUT_PATH)
