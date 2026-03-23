@@ -31,12 +31,13 @@ Attention layers handle structure and token relationships, these are left frozen
 
 ## Status: 
 Gradient norm scoring revealed an unexpected outlier: 
+
         - layer 2 down_proj scored 84.1, which is approximately 7x higher than the next most damaged layer (12.9),
 
         - layers 9-27 show consistent moderate damage, consistent with the hypothesis that middle layers store mathematical reasoning capabilities,
 
         - restoring top 30 layers recovered 53% of the performance drop without any retraining,
-        
+
         - currently running specificity scoring to separate genuinely broken layers from naturally important ones
 
 
