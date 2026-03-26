@@ -12,6 +12,10 @@ Models tested:
   - restored top 30
   - restored specificity top 10
   - surgical model (restored + retrained)
+
+Note: all evaluations use --apply_chat_template for accurate
+      instruct model scoring. Results saved with _chat suffix
+      to distinguish from previous runs without chat template.
 """
 
 import subprocess
@@ -23,27 +27,24 @@ from datetime import datetime
 # ── CONFIG ────────────────────────────────────────────────
 DEVICE = "cuda"
 
-# all models to evaluate
-# name → path
 MODELS = {
-    "base_model":           "Qwen/Qwen2.5-3B-Instruct",
-    "finetuned_broken":     "merged_model/",
-    "restore_top5":         "restored_model/",
-    "restore_top15":        "restored_model_B/",
-    "restore_top30":        "restored_model_C/",
-    "restore_specificity":  "restored_model_D/",
-    "surgical_model":       "surgical_model/",
+    "base_model":          "Qwen/Qwen2.5-3B-Instruct",
+    "finetuned_broken":    "merged_model/",
+    "restore_top5":        "restored_model/",
+    "restore_top15":       "restored_model_B/",
+    "restore_top30":       "restored_model_C/",
+    "restore_specificity": "restored_model_D/",
+    "surgical_model":      "surgical_model/",
 }
 
-# tasks to run
 TASKS = ["gsm8k", "arc_challenge"]
 
-RESULTS_DIR = "results/"
+RESULTS_DIR = "results/chat/"
 
 
 # ── RUN ONE EVALUATION ────────────────────────────────────
 def run_eval(model_name, model_path, task):
-    output_file = f"{RESULTS_DIR}{model_name}_{task}.json"
+    output_file = f"{RESULTS_DIR}{model_name}_{task}_chat.json"
 
     # skip if already evaluated
     if os.path.exists(output_file):
@@ -59,7 +60,8 @@ def run_eval(model_name, model_path, task):
         "--tasks", task,
         "--device", DEVICE,
         "--output_path", output_file,
-        "--batch_size", "1"
+        "--batch_size", "1",
+        "--apply_chat_template",
     ]
 
     result = subprocess.run(cmd, capture_output=False)
@@ -80,30 +82,36 @@ def parse_score(result_file, task):
         data = json.load(f)
 
     try:
-        # navigate the lm-eval output structure
         results = data["results"][task]
 
         if task == "gsm8k":
+            # try flexible first, fall back to strict
             score = results.get("exact_match,flexible-extract", None)
+            if score is None:
+                score = results.get("exact_match,strict-match", None)
+
         elif task == "arc_challenge":
             score = results.get("acc_norm,none", None)
+            if score is None:
+                score = results.get("acc,none", None)
 
         if score is not None:
             return round(score * 100, 2)
+
     except Exception as e:
         print(f"  parse error for {result_file}: {e}")
 
     return None
 
 
-# ── BUILD RESULTS TABLE ───────────────────────────────────
+# ── PRINT RESULTS TABLE ───────────────────────────────────
 def print_results_table(all_results):
     print("\n")
-    print("=" * 70)
-    print("FINAL RESULTS TABLE")
-    print("=" * 70)
-    print(f"{'Model':<26} {'GSM8K':>8} {'ARC':>8} {'GSM8K Change':>14}")
-    print("-" * 70)
+    print("=" * 72)
+    print("FINAL RESULTS TABLE — with chat template")
+    print("=" * 72)
+    print(f"{'Model':<26} {'GSM8K':>8} {'ARC':>8} {'GSM8K vs broken':>16}")
+    print("-" * 72)
 
     baseline_gsm8k = None
 
@@ -111,10 +119,9 @@ def print_results_table(all_results):
         gsm8k = scores.get("gsm8k")
         arc   = scores.get("arc_challenge")
 
-        gsm8k_str  = f"{gsm8k:.2f}%" if gsm8k else "—"
-        arc_str    = f"{arc:.2f}%"   if arc   else "—"
+        gsm8k_str = f"{gsm8k:.2f}%" if gsm8k is not None else "—"
+        arc_str   = f"{arc:.2f}%"   if arc   is not None else "—"
 
-        # change vs finetuned broken model
         if model_name == "finetuned_broken" and gsm8k:
             baseline_gsm8k = gsm8k
 
@@ -124,11 +131,9 @@ def print_results_table(all_results):
         else:
             change_str = "—"
 
-        print(f"{model_name:<26} {gsm8k_str:>8} {arc_str:>8} {change_str:>14}")
+        print(f"{model_name:<26} {gsm8k_str:>8} {arc_str:>8} {change_str:>16}")
 
-    print("=" * 70)
-
-    # save to markdown
+    print("=" * 72)
     save_markdown_table(all_results, baseline_gsm8k)
 
 
@@ -138,15 +143,20 @@ def save_markdown_table(all_results, baseline_gsm8k):
     lines.append("# Final Evaluation Results\n")
     lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}\n")
     lines.append("")
-    lines.append("| Model | GSM8K | ARC Challenge | GSM8K Change |")
-    lines.append("|-------|-------|---------------|--------------|")
+    lines.append(
+        "> All evaluations use `--apply_chat_template` for accurate "
+        "instruct model scoring.\n"
+    )
+    lines.append("")
+    lines.append("| Model | GSM8K | ARC Challenge | GSM8K vs broken |")
+    lines.append("|-------|-------|---------------|-----------------|")
 
     for model_name, scores in all_results.items():
         gsm8k = scores.get("gsm8k")
         arc   = scores.get("arc_challenge")
 
-        gsm8k_str = f"{gsm8k:.2f}%" if gsm8k else "—"
-        arc_str   = f"{arc:.2f}%"   if arc   else "—"
+        gsm8k_str = f"{gsm8k:.2f}%" if gsm8k is not None else "—"
+        arc_str   = f"{arc:.2f}%"   if arc   is not None else "—"
 
         if baseline_gsm8k and gsm8k and model_name != "finetuned_broken":
             change = gsm8k - baseline_gsm8k
@@ -155,15 +165,17 @@ def save_markdown_table(all_results, baseline_gsm8k):
             change_str = "—"
 
         lines.append(
-            f"| {model_name} | {gsm8k_str} | {arc_str} | {change_str} |"
+            f"| {model_name} | {gsm8k_str} | "
+            f"{arc_str} | {change_str} |"
         )
 
     output = "\n".join(lines)
 
-    with open("results/final_results.md", "w") as f:
+    md_path = "results/final_results.md"
+    with open(md_path, "w") as f:
         f.write(output)
 
-    print(f"\nMarkdown table saved to results/final_results.md")
+    print(f"\nMarkdown table saved to {md_path}")
 
 
 # ── MAIN ──────────────────────────────────────────────────
@@ -177,11 +189,11 @@ if __name__ == "__main__":
         # skip surgical model if not trained yet
         if model_name == "surgical_model":
             if not os.path.exists(model_path):
-                print(f"\nSkipping {model_name} — not trained yet")
+                print(f"\nSkipping surgical_model — not trained yet")
                 continue
 
         print(f"\nEvaluating: {model_name}")
-        print(f"Path: {model_path}")
+        print(f"Path:       {model_path}")
 
         all_results[model_name] = {}
 
@@ -189,6 +201,8 @@ if __name__ == "__main__":
             result_file = run_eval(model_name, model_path, task)
             score = parse_score(result_file, task)
             all_results[model_name][task] = score
-            print(f"  {task}: {score}%")
+
+            score_str = f"{score:.2f}%" if score is not None else "failed"
+            print(f"  {task}: {score_str}")
 
     print_results_table(all_results)
